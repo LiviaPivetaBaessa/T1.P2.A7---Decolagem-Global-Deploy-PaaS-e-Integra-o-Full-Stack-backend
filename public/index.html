@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Meu Assistente IA</title>
+    <link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+
+    <div class="chat-container">
+        <div class="chat-header">
+            <h3>🤖 Assistente Gemini</h3>
+            <button id="btnDownload" onclick="baixarPDF()">📥 Baixar PDF</button>
+        </div>
+
+        <div id="chat-box" class="chat-box">
+            <!-- Mensagens aparecem aqui -->
+            <div class="msg ai">Olá! Como posso te ajudar hoje?</div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="userInput" placeholder="Digite sua pergunta..." onkeypress="verificarTecla(event)">
+            <button onclick="enviar()">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        let conversaCompleta = ""; // Armazena o texto para o PDF
+
+        async function enviar() {
+            const input = document.getElementById('userInput');
+            const texto = input.value.trim();
+            if (!texto) return;
+
+            // Adiciona mensagem do usuário na tela
+            exibirMensagem(texto, 'user');
+            input.value = "";
+            conversaCompleta += `Usuário: ${texto}\n`;
+
+            // Chama o servidor
+            try {
+                const response = await fetch('http://localhost:3000/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ mensagem: texto })
+                });
+                const data = await response.json();
+                
+                exibirMensagem(data.resposta, 'ai');
+                conversaCompleta += `IA: ${data.resposta}\n\n`;
+            } catch (e) {
+                exibirMensagem("Erro ao conectar com o servidor.", 'ai');
+            }
+        }
+
+        function exibirMensagem(texto, tipo) {
+            const chatBox = document.getElementById('chat-box');
+            const div = document.createElement('div');
+            div.className = `msg ${tipo}`;
+            div.innerText = texto;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function verificarTecla(e) {
+            if (e.key === 'Enter') enviar();
+        }
+
+        async function baixarPDF() {
+            if (!conversaCompleta) return alert("Inicie uma conversa primeiro!");
+            
+            const btn = document.getElementById('btnDownload');
+            btn.innerText = "⏳ Gerando...";
+
+            const response = await fetch('/gerar-pdf', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ historico: conversaCompleta })
+            });
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "resumo_conversa.pdf";
+            a.click();
+            btn.innerText = "📥 Baixar PDF";
+        }
+    </script>
+</body>
+</html>
