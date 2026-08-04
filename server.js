@@ -1,81 +1,24 @@
-// 1. Importações (Bibliotecas)
+// 1. Importações
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { path } = require('pdfkit');
 const mongoose = require('mongoose');
+const chatRoutes = require('./routes/chatRoutes');
 
-// Conectando ao Banco de Dados Nuvem
+// 2. Conexão com o Banco de Dados
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('📦 Conectado ao MongoDB Atlas!'))
   .catch((err) => console.error('❌ Erro no banco:', err));
 
-// Definindo como a mensagem será salva no banco
-const MensagemSchema = new mongoose.Schema({
-    role: String, // 'user' (usuário) ou 'model' (IA)
-    parts: [{ text: String }], // O conteúdo da mensagem
-    dataHora: { type: Date, default: Date.now } // Hora exata
-});
-
-// Criando a "Tabela" (Collection) baseada no Schema
-const Mensagem = mongoose.model('Mensagem', MensagemSchema);
-
-
-// 2. Configurações Iniciais do Servidor
+// 3. Configurações do servidor
 const app = express();
-app.use(express.json()); // Permite que o servidor entenda JSON
-app.use(cors()); // Permite que front-ends se conectem sem bloqueio
+app.use(express.json());
+app.use(cors());
 
-// 3. Configuração da IA
-const apiKey = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey);
+// 4. Rotas
+app.use('/api/chat', chatRoutes);
 
-// 4. CRIANDO A ROTA (Endpoint) DA API
-// Vamos usar o método POST, pois estamos ENVIANDO uma pergunta para o servidor
-app.post('/api/chat', async (req, res) => {
-    try {
-        const { pergunta } = req.body;
-        if (!pergunta) return res.status(400).json({ erro: "Envie uma pergunta." });
-
-        // 1. Salva a pergunta do usuário no Banco de Dados
-        await Mensagem.create({ role: "user", parts: [{ text: pergunta }] });
-
-        // 2. Busca o histórico de conversas no Banco (limitado às últimas 20 mensagens)
-        // Ocultamos o ID e a data, pois o Gemini só quer saber de 'role' e 'parts'
-        const historicoRaw = await Mensagem.find()
-                                .sort({ dataHora: 1 })
-                                .limit(20);
-
-const historico = historicoRaw.map(msg => ({
-    role: msg.role,
-    parts: msg.parts.map(p => ({ text: p.text }))
-}));
-
-        // 3. Inicia o chat do Gemini, ENVIANDO O HISTÓRICO JUNTO!
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const chat = model.startChat({
-            history: historico // O Gemini lê isso e "lembra" do que conversaram
-        });
-
-        // 4. Manda a nova pergunta para a IA
-        const result = await chat.sendMessage(pergunta);
-        const respostaDaIA = result.response.text();
-
-        // 5. Salva a resposta da IA no Banco de Dados para uso futuro
-        await Mensagem.create({ role: "model", parts: [{ text: respostaDaIA }] });
-
-        // 6. Devolve a resposta para o Front-end
-        return res.status(200).json({ sucesso: true, resposta: respostaDaIA });
-
-    } catch (erro) {
-        console.error("❌ Erro:", erro);
-        return res.status(500).json({ erro: "Amnésia do servidor. Erro interno." });
-    }
-});
-
-
-// A nuvem define a porta via process.env.PORT. Se não houver, usa a 3000 (local)
+// 5. Inicialização
 const PORTA = process.env.PORT || 3000;
 app.listen(PORTA, () => {
     console.log(`🚀 Servidor rodando na porta ${PORTA}`);
