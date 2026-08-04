@@ -43,10 +43,14 @@ app.post('/api/chat', async (req, res) => {
 
         // 2. Busca o histórico de conversas no Banco (limitado às últimas 20 mensagens)
         // Ocultamos o ID e a data, pois o Gemini só quer saber de 'role' e 'parts'
-        const historico = await Mensagem.find()
-                                        .select('role parts -_id') 
-                                        .sort({ dataHora: 1 })
-                                        .limit(20);
+        const historicoRaw = await Mensagem.find()
+                                .sort({ dataHora: 1 })
+                                .limit(20);
+
+const historico = historicoRaw.map(msg => ({
+    role: msg.role,
+    parts: msg.parts.map(p => ({ text: p.text }))
+}));
 
         // 3. Inicia o chat do Gemini, ENVIANDO O HISTÓRICO JUNTO!
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
