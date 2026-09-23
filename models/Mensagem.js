@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 // Definindo como a mensagem será salva no banco
 const MensagemSchema = new mongoose.Schema({
-    role: String, // 'user' (usuário) ou 'model' (IA)
-    parts: [{ text: String }], // O conteúdo da mensagem
+    role: { type: String, enum: ['user', 'model'], required: true }, // 'user' (usuário) ou 'model' (IA)
+    parts: [{ text: String, _id: false }], // O conteúdo da mensagem (sem _id nos subdocumentos)
     dataHora: { type: Date, default: Date.now } // Hora exata
 });
 
